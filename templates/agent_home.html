@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{ name }}</title>
+    <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          Helvetica, Arial, sans-serif;
+        margin: 0;
+        padding: 2rem;
+        background: #fff;
+        color: #111;
+      }
+
+      .container {
+        max-width: 700px;
+        margin: 0 auto;
+      }
+
+      h1 {
+        font-size: 2rem;
+        margin-bottom: 0.25rem;
+      }
+
+      p {
+        font-size: 1rem;
+        color: #444;
+      }
+
+      .actions {
+        margin-top: 1rem;
+      }
+
+      a.button,
+      button {
+        display: inline-block;
+        margin-right: 1rem;
+        margin-top: 0.5rem;
+        padding: 0.5rem 1rem;
+        border: 1px solid #000;
+        background: transparent;
+        text-decoration: none;
+        font-size: 0.95rem;
+        color: #000;
+        border-radius: 4px;
+        transition: background 0.2s;
+        cursor: pointer;
+      }
+
+      a.button:hover,
+      button:hover {
+        background: #f0f0f0;
+      }
+
+      textarea,
+      select,
+      input[type="text"],
+      input[type="email"] {
+        width: 100%;
+        font-size: 0.9rem;
+        padding: 0.5rem;
+        margin-top: 0.25rem;
+        margin-bottom: 0.75rem;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        font-family: monospace;
+      }
+
+      .file-upload-area {
+        width: 100%;
+        border: 2px dashed #ccc;
+        border-radius: 4px;
+        padding: 2rem;
+        margin-top: 0.25rem;
+        margin-bottom: 0.75rem;
+        text-align: center;
+        background: #fafafa;
+        transition: border-color 0.2s, background-color 0.2s;
+        cursor: pointer;
+      }
+
+      .file-upload-area:hover {
+        border-color: #999;
+        background: #f5f5f5;
+      }
+
+      .file-upload-area.dragover {
+        border-color: #000;
+        background: #f0f0f0;
+      }
+
+      .file-upload-area input[type="file"] {
+        display: none;
+      }
+
+      .file-upload-text {
+        color: #666;
+        font-size: 0.9rem;
+        margin-bottom: 0.5rem;
+      }
+
+      .file-upload-hint {
+        color: #999;
+        font-size: 0.8rem;
+      }
+
+      .file-list {
+        margin-top: 0.5rem;
+        margin-bottom: 0.75rem;
+      }
+
+      .file-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.5rem;
+        background: #f9f9f9;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        margin-bottom: 0.5rem;
+        font-size: 0.85rem;
+      }
+
+      .file-name {
+        flex: 1;
+        margin-right: 1rem;
+        word-break: break-all;
+      }
+
+      .file-size {
+        color: #666;
+        margin-right: 1rem;
+        white-space: nowrap;
+      }
+
+      .remove-file {
+        background: none;
+        border: none;
+        color: #999;
+        cursor: pointer;
+        padding: 0.25rem;
+        font-size: 0.8rem;
+        margin: 0;
+      }
+
+      .remove-file:hover {
+        color: #000;
+        background: none;
+      }
+
+      .response {
+        white-space: pre-wrap;
+        background: #f9f9f9;
+        padding: 1rem;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 0.85rem;
+        margin-top: 1rem;
+      }
+
+      #agent-testing {
+        margin-top: 4rem;
+      }
+
+      label {
+        display: block;
+        font-weight: 500;
+        margin-bottom: 0.25rem;
+        font-size: 0.9rem;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="container">
+      <h1>{{ name }}</h1>
+      <p>{{ description }}</p>
+
+      <div class="actions">
+        <a
+          class="button"
+          href="{{ request.url.path.rstrip('/') }}/.well-known/agent.json"
+          target="_blank"
+          >Get Agent Card</a
+        >
+      </div>
+
+      <section id="agent-testing">
+        <h2>🧪 Test the Agent</h2>
+        <form id="testForm">
+          <label for="mode">Request Type</label>
+          <select id="mode" name="mode">
+            <option value="message/send">message/send (blocking)</option>
+            <option value="message/stream">message/stream (streaming)</option>
+          </select>
+
+          <label for="message">Message Text</label>
+          <textarea id="message" name="message" rows="4">
+{{ defaultText }}
+</textarea
+          >
+
+          <label for="files">Files</label>
+          <div class="file-upload-area" id="fileUploadArea">
+            <input type="file" id="fileInput" multiple accept="*/*" />
+            <div class="file-upload-text">
+              Click to select files or drag and drop them here
+            </div>
+            <div class="file-upload-hint">Supports all file types</div>
+          </div>
+
+          <div id="fileList" class="file-list"></div>
+
+          <button type="submit">Send Test Request</button>
+        </form>
+      </section>
+
+      <div id="response" class="response" style="display: none"></div>
+    </div>
+
+    <script>
+      const form = document.getElementById("testForm");
+      const responseBox = document.getElementById("response");
+      const fileInput = document.getElementById("fileInput");
+      const fileUploadArea = document.getElementById("fileUploadArea");
+      const fileList = document.getElementById("fileList");
+
+      let selectedFiles = [];
+
+      // File upload area click handler
+      fileUploadArea.addEventListener("click", () => {
+        fileInput.click();
+      });
+
+      // Prevent default drag behaviors
+      ["dragenter", "dragover", "dragleave", "drop"].forEach((eventName) => {
+        fileUploadArea.addEventListener(eventName, preventDefaults, false);
+        document.body.addEventListener(eventName, preventDefaults, false);
+      });
+
+      // Highlight drop area when item is dragged over it
+      ["dragenter", "dragover"].forEach((eventName) => {
+        fileUploadArea.addEventListener(eventName, highlight, false);
+      });
+
+      ["dragleave", "drop"].forEach((eventName) => {
+        fileUploadArea.addEventListener(eventName, unhighlight, false);
+      });
+
+      // Handle dropped files
+      fileUploadArea.addEventListener("drop", handleDrop, false);
+
+      function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+
+      function highlight() {
+        fileUploadArea.classList.add("dragover");
+      }
+
+      function unhighlight() {
+        fileUploadArea.classList.remove("dragover");
+      }
+
+      function handleDrop(e) {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        handleFiles(files);
+      }
+
+      // Handle file input change
+      fileInput.addEventListener("change", function (e) {
+        handleFiles(e.target.files);
+      });
+
+      function handleFiles(files) {
+        [...files].forEach(addFile);
+        updateFileList();
+      }
+
+      function addFile(file) {
+        // Check if file already exists
+        if (
+          !selectedFiles.find(
+            (f) => f.name === file.name && f.size === file.size
+          )
+        ) {
+          selectedFiles.push(file);
+        }
+      }
+
+      function removeFile(index) {
+        selectedFiles.splice(index, 1);
+        updateFileList();
+      }
+
+      function formatFileSize(bytes) {
+        if (bytes === 0) return "0 Bytes";
+        const k = 1024;
+        const sizes = ["Bytes", "KB", "MB", "GB"];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+      }
+
+      function updateFileList() {
+        if (selectedFiles.length === 0) {
+          fileList.innerHTML = "";
+          return;
+        }
+
+        fileList.innerHTML = selectedFiles
+          .map(
+            (file, index) => `
+          <div class="file-item">
+            <span class="file-name">${file.name}</span>
+            <span class="file-size">${formatFileSize(file.size)}</span>
+            <button type="button" class="remove-file" onclick="removeFile(${index})">×</button>
+          </div>
+        `
+          )
+          .join("");
+      }
+
+      async function fileToBase64(file) {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.readAsDataURL(file);
+          reader.onload = () => {
+            const base64 = reader.result.split(",")[1];
+            resolve(base64);
+          };
+          reader.onerror = (error) => reject(error);
+        });
+      }
+
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+
+        const message = document.getElementById("message").value;
+        const mode = document.getElementById("mode").value;
+
+        // Prepare message parts
+        const parts = [
+          {
+            kind: "text",
+            text: message,
+          },
+        ];
+
+        // Add file parts
+        for (const file of selectedFiles) {
+          try {
+            const base64Data = await fileToBase64(file);
+            parts.push({
+              kind: "file",
+              file: {
+                name: file.name,
+                mimeType: file.type || "application/octet-stream",
+                bytes: base64Data,
+              },
+            });
+          } catch (error) {
+            console.error(`Error processing file ${file.name}:`, error);
+          }
+        }
+
+        const payload = {
+          jsonrpc: "2.0",
+          id: "test",
+          method: mode,
+          params: {
+            message: {
+              messageId: String(Date.now()),
+              role: "user",
+              parts: parts,
+            },
+            configuration: {
+              acceptedOutputModes: ["text/plain"],
+              historyLength: 0,
+            },
+          },
+        };
+
+        const res = await fetch(window.location.pathname, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+
+        responseBox.style.display = "block";
+        responseBox.textContent = await res.text();
+      });
+    </script>
+  </body>
+</html>
