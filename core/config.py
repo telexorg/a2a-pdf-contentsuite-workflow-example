@@ -45,6 +45,8 @@ class Config:
 
     common_model = CommonModel
 
+    host = os.getenv("HOST", "127.0.0.1")
+    port = int(os.getenv("PORT", "5700"))
 
 def create_config() -> Config:
     base_url = os.getenv("BASE_URL", "http://localhost:5700")

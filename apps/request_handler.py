@@ -95,7 +95,7 @@ async def submit_message(
         parts.append(
             schemas.FilePart(
                 file=schemas.FileContent(
-                    name=f["name"], mime_type=f["mimeType"], bytes=f["bytes"]
+                    name=f.name, mime_type=f.mimeType, bytes=f.bytes
                 )
             )
         )
