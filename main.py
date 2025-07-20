@@ -7,7 +7,7 @@ from core.agent_apps import AGENT_APPS
 from core.config import config
 import apps.request_handler as request_handler_app
 
-app = FastAPI()
+app = FastAPI(root_path="/pdf-workflow-agents")
 
 templates = Jinja2Templates(directory="templates")
 
