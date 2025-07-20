@@ -4,6 +4,7 @@ from apps import (
     mailer,
     podcast_creator,
     spotify_uploader,
+    text_to_speech
 )
 
 from core.agent_list import get_agent_config_by_id
@@ -23,10 +24,14 @@ podcast_creator_agent.app = podcast_creator.app
 spotify_uploader_agent = get_agent_config_by_id("spotify-uploader")
 spotify_uploader_agent.app = spotify_uploader.app
 
+text_to_speed_agent = get_agent_config_by_id("text-to-speech")
+text_to_speed_agent.app = text_to_speech.app
+
 AGENT_APPS = [
     pdf_to_markdown_agent,
     pptx_creator_agent,
     mailer_agent,
     podcast_creator_agent,
     spotify_uploader_agent,
+    text_to_speed_agent
 ]

@@ -29,6 +29,11 @@ class SpotifyUploaderConfig:
     base_url: str
 
 
+@dataclass
+class TextToSpeechAgentConfig:
+    base_url: str
+
+
 class CommonModel:
     name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
     api_key = os.getenv("GEMINI_API_KEY")
@@ -42,6 +47,7 @@ class Config:
     mailer: MailerConfig
     podcast_creator: PodcastCreatorConfig
     spotify_uploader: SpotifyUploaderConfig
+    text_to_speech: TextToSpeechAgentConfig
 
     common_model = CommonModel
 
@@ -59,6 +65,7 @@ def create_config() -> Config:
         mailer=MailerConfig(base_url=f"{base_url}/mailer"),
         podcast_creator=PodcastCreatorConfig(base_url=f"{base_url}/podcast-creator"),
         spotify_uploader=SpotifyUploaderConfig(base_url=f"{base_url}/spotify-uploader"),
+        text_to_speech=TextToSpeechAgentConfig(base_url=f"{base_url}/text-to-speech"),
     )
 
 

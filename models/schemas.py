@@ -6,7 +6,7 @@ Contains schemas from the A2A specification version 0.2.5.
 
 from datetime import datetime
 from enum import Enum
-from typing import Annotated, Any, Literal, Self
+from typing import Annotated, Any, Literal
 from uuid import uuid4
 
 from pydantic import (
@@ -182,7 +182,7 @@ class FileContent(BaseModel):
     uri: str | None = None
 
     @model_validator(mode="after")
-    def check_content(self) -> Self:
+    def check_content(self):
         """Validates that either bytes or URI is present, but not both."""
         missing_content_msg = "Either 'bytes' or 'uri' must be present in the file data"
         conflicting_content_msg = "Only one of 'bytes' or 'uri' can be present"

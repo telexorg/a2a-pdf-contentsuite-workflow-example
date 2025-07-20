@@ -8,6 +8,7 @@ AgentId = Literal[
     "mailer",
     "podcast-creator",
     "spotify-uploader",
+    "text-to-speech"
 ]
 
 @dataclass()
@@ -48,6 +49,17 @@ AGENT_CONFIGS: tuple[AgentConfig, ...] = (
         name="Spotify Uploader",
         description="Publish audio content directly to Spotify.",
         default_text="Upload this audio file to Spotify with the following title and description:",
+    ),
+    AgentConfig(
+        id="text-to-speech", 
+        name="Text to Speech",
+        description="Converts text to speech.",
+        default_text="""
+        Convert the following convo to speech:
+
+        Authur: Another annoying day to be alive
+        Ford: Yeah, but the earth will be destroyed today.
+        """,
     ),
 )
 
