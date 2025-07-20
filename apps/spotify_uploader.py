@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Request
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
-import schemas
+import models.schemas as schemas
 from core.config import config
 from common.agent_details import get_agent_response
 

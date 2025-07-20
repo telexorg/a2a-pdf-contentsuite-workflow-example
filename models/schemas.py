@@ -231,6 +231,8 @@ class PushNotificationConfig(BaseModel):
 class MessageSendConfiguration(BaseModel):
     """Configuration options for sending messages."""
 
+    model_config = ConfigDict(populate_by_name=True)
+
     accepted_output_modes: list[str] = Field(alias="acceptedOutputModes")
     history_length: int | None = Field(default=0, alias="historyLength")
     push_notification_config: PushNotificationConfig | None = Field(

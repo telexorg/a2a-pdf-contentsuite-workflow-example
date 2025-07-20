@@ -8,10 +8,11 @@ from collections import defaultdict
 import base64
 import pymupdf
 
-import schemas
+import models.schemas as schemas
 from common.ai import model
 from core.config import config
 from common.agent_details import get_agent_response
+from common.a2a import extract_message_parts
 
 md = MarkdownIt("commonmark", {"breaks": True, "html": True})
 
@@ -73,25 +74,13 @@ def read_pdf_to_md(request: Request):
 
 @app.post("/")
 def handle_agent_response(request: schemas.SendMessageRequest):
-    task_id = (
-        uuid4().hex
-        if not request.params.message.task_id
-        else request.params.message.task_id
-    )
-    text_parts = [
-        part.text for part in request.params.message.parts if part.kind == "text"
-    ]
-    file_parts = [
-        part.file for part in request.params.message.parts if part.kind == "file"
-    ]
-
+    content_parts = extract_message_parts(request, mime_type_filter=["application/pdf"])
     unique_pdf_files = defaultdict(str)
 
-    for part in file_parts:
-        if part.bytes and part.mime_type == "application/pdf":
-            unique_pdf_files[part.name] += part.bytes
+    for part in content_parts.file_parts:
+        unique_pdf_files[part.name] += part.bytes
 
-    user_input = "\n".join(text_parts)
+    user_input = content_parts.joined_text
 
     if len(unique_pdf_files.keys()) == 0:
         return schemas.SendMessageResponse(
@@ -107,6 +96,8 @@ def handle_agent_response(request: schemas.SendMessageRequest):
                 ],
             )
         )
+    
+    task_id = uuid4().hex # create a task id since we are sure that we are converting a pdf to markdown
 
     response_parts = []
 
@@ -161,7 +152,7 @@ def agent_card():
         documentationUrl=f"{config.pdf_to_markdown.base_url}/docs",
         capabilities=schemas.AgentCapabilities(
             streaming=True,
-            pushNotifications=False,
+            pushNotifications=True,
             stateTransitionHistory=True,
         ),
         authentication=schemas.AgentAuthentication(schemes=["Bearer"]),
