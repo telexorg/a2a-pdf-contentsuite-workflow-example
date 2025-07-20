@@ -47,6 +47,7 @@ class Config:
 
     host = os.getenv("HOST", "127.0.0.1")
     port = int(os.getenv("PORT", "5700"))
+    base_path = os.getenv("BASE_PATH", "")
 
 def create_config() -> Config:
     base_url = os.getenv("BASE_URL", "http://localhost:5700")
