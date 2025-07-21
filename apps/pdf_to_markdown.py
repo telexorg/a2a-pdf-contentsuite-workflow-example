@@ -260,7 +260,9 @@ async def handle_json_rpc(
     if isinstance(request, schemas.GetTaskRequest):
         task_id = request.params.id
         if task_id and task_id in active_tasks:
-            return schemas.SendMessageResponse(id=uuid4().hex, result=active_tasks[task_id])
+            return schemas.SendMessageResponse(
+                id=uuid4().hex, result=active_tasks[task_id]
+            )
         else:
             return schemas.JSONRPCResponse(
                 error=schemas.JSONRPCError(code=404, message="Task not found"),
@@ -269,7 +271,7 @@ async def handle_json_rpc(
     # Handle message/send and message/stream
     if isinstance(request, (schemas.SendMessageRequest, schemas.StreamMessageRequest)):
         content_parts = extract_message_parts(
-            request, mime_type_filter=["application/pdf"]
+            request, mime_type_filter=["application/pdf"], download_files=True
         )
         unique_pdf_files = defaultdict(str)
 

@@ -1,5 +1,8 @@
 from typing import NamedTuple, Optional
 import models.schemas as schemas
+import httpx
+import base64
+
 
 class MessageParts(NamedTuple):
     joined_text: str
@@ -8,27 +11,28 @@ class MessageParts(NamedTuple):
     data_parts: list[dict]
 
 
-def extract_message_parts(
-    request: schemas.SendMessageRequest, mime_type_filter: Optional[list[str]] = None
+async def extract_message_parts(
+    request: schemas.SendMessageRequest,
+    mime_type_filter: Optional[list[str]] = None,
+    download_files: bool = False,
 ) -> MessageParts:
     """
-    Reusable function to extract text and file parts from a request.
+    Extracts message parts including optional file download via URI.
 
     Args:
-        request: The incoming message request
-        mime_type_filter: Optional MIME type to filter files by (e.g., 'application/pdf')
+        request: The incoming SendMessageRequest.
+        mime_type_filter: Optional list of MIME types to filter files by.
+        download_files: If True, attempts to download file content from URI if not present in `bytes`.
 
     Returns:
-        Tuple of (user_input_text, text_parts_list, file_parts_list)
+        MessageParts with joined_text, text_parts, file_parts, and data_parts.
     """
     text_parts = [
         part.text for part in request.params.message.parts if part.kind == "text"
     ]
 
-    file_parts = [
-        part.file
-        for part in request.params.message.parts
-        if part.kind == "file" and part.file.bytes
+    file_parts_raw = [
+        part.file for part in request.params.message.parts if part.kind == "file"
     ]
 
     data_parts = [
@@ -36,7 +40,26 @@ def extract_message_parts(
     ]
 
     if mime_type_filter:
-        file_parts = [part for part in file_parts if part.mime_type in mime_type_filter]
+        file_parts_raw = [f for f in file_parts_raw if f.mime_type in mime_type_filter]
+
+    file_parts: list[schemas.FileContent] = []
+
+    if download_files:
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            for file_part in file_parts_raw:
+                if not file_part.bytes and file_part.uri:
+                    try:
+                        response = await client.get(file_part.uri)
+                        response.raise_for_status()
+                        file_part.bytes = base64.b64encode(response.content).decode()
+                    except Exception as e:
+                        raise ValueError(
+                            f"Failed to download file from {file_part.uri}: {str(e)}"
+                        )
+
+                file_parts.append(file_part)
+    else:
+        file_parts = file_parts_raw
 
     joined_text = "\n".join(text_parts)
 
