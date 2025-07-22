@@ -1,24 +1,32 @@
+import base64
+import json
+import asyncio
 from uuid import uuid4
+from datetime import datetime
+from typing import AsyncGenerator, Union
+
+import pymupdf
+import httpx
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.background import BackgroundTasks
 from markdown_it import MarkdownIt
 from pydantic import ConfigDict, BaseModel
 from pydantic_ai import Agent
-from collections import defaultdict
-import base64
-import pymupdf
-import asyncio
-import httpx
-import json
-from datetime import datetime
-from typing import AsyncGenerator, Union
 
 import models.schemas as schemas
 from common.ai import model
 from core.config import config
 from common.agent_details import get_agent_response
-from common.a2a import WebhookDetails, extract_message_parts, download_file_content, extract_webhook_details
+from common.a2a import (
+    WebhookDetails,
+    extract_message_parts,
+    download_file_content,
+    extract_webhook_details,
+    send_webhook_notification
+)
+from common.logconfig import log
+
 
 md = MarkdownIt("commonmark", {"breaks": True, "html": True})
 
@@ -39,8 +47,6 @@ pdf_to_markdown_agent = Agent(
 )
 
 app = FastAPI()
-
-# Store active tasks in memory (in production, use a database)
 active_tasks: dict[str, schemas.Task] = {}
 
 
@@ -59,7 +65,6 @@ def extract_pdf_text(pdf_bytes_b64: str) -> str:
     """Extract text from PDF using base64 encoded bytes."""
     try:
         pdf_bytes = base64.b64decode(pdf_bytes_b64)
-
         doc = pymupdf.open(stream=pdf_bytes, filetype="pdf")
         text_content = []
 
@@ -76,37 +81,16 @@ def extract_pdf_text(pdf_bytes_b64: str) -> str:
         return f"Error extracting text from PDF: {str(e)}"
 
 
-async def send_webhook_notification(webhook_details: WebhookDetails, task: schemas.Task):
-    """Send task update to webhook URL."""
-    try:
-        async with httpx.AsyncClient(follow_redirects=True) as client:
-            headers = {"Content-Type": "application/json"}
-
-            if webhook_details.is_telex:
-                headers["X-TELEX-API-KEY"] = webhook_details.api_key
-
-            a2a_response = schemas.SendMessageResponse(result=task)
-
-            response = await client.post(
-                webhook_details.url,
-                json=a2a_response.model_dump(by_alias=True),
-                headers=headers,
-                timeout=30.0,
-            )
-            print(response.text)
-
-            response.raise_for_status()
-    except Exception as e:
-        print(f"Failed to send webhook notification: {e}, {response.text}")
-
 
 
 async def process_pdf_task_background(
-    task_id: str, unique_pdf_files: list[schemas.FileContent], user_input: str, webhook_details: WebhookDetails
+    task_id: str,
+    unique_pdf_files: list[schemas.FileContent],
+    user_input: str,
+    webhook_details: WebhookDetails,
 ):
     """Background task to process PDF files and send webhook."""
     try:
-        # Update task status to working
         task = active_tasks[task_id]
         task.status = schemas.TaskStatus(
             state=schemas.TaskState.working, timestamp=datetime.now()
@@ -117,18 +101,19 @@ async def process_pdf_task_background(
 
         for file_content in unique_pdf_files:
             try:
-                # Decode the base64 file content
-                base64_string = file_content.bytes if file_content.bytes else await download_file_content(file_content.uri)
+                log.info("processing_pdf", file_name=file_content.name)
+
+                base64_string = file_content.bytes or await download_file_content(
+                    file_content.uri
+                )
                 pdf_b64 = decode_base64_file(base64_string)
 
-                # Extract text from PDF
                 pdf_text = extract_pdf_text(pdf_b64)
 
                 if pdf_text.startswith("Error"):
                     response_parts.append(schemas.TextPart(text=f"❌ {pdf_text}"))
                     continue
 
-                # Create artifact with the markdown content
                 artifact = schemas.Artifact(
                     name=f"{file_content.name}.md",
                     description=f"Markdown conversion of {file_content.name}",
@@ -142,13 +127,18 @@ async def process_pdf_task_background(
                         text=f"✅ Successfully converted {file_content.name} to markdown"
                     )
                 )
+                log.info("conversion_success", file_name=file_content.name)
 
             except Exception as e:
+                log.warning(
+                    "conversion_error", file_name=file_content.name, error=str(e)
+                )
                 response_parts.append(
-                    schemas.TextPart(text=f"❌ Error processing {file_content.name}: {str(e)}")
+                    schemas.TextPart(
+                        text=f"❌ Error processing {file_content.name}: {str(e)}"
+                    )
                 )
 
-        # Update task with completion
         completion_message = schemas.Message(
             message_id=uuid4().hex,
             context_id=task.context_id,
@@ -164,11 +154,11 @@ async def process_pdf_task_background(
         )
         task.artifacts = artifacts
 
-        # Send final webhook notification
         await send_webhook_notification(webhook_details, task)
 
     except Exception as e:
-        # Update task with failure
+        log.error("task_failed", task_id=task_id, error=str(e))
+
         error_message = schemas.Message(
             message_id=uuid4().hex,
             context_id=task.context_id if task_id in active_tasks else None,
@@ -193,7 +183,6 @@ async def stream_pdf_processing(
     """Stream PDF processing results as JSON-RPC responses."""
     for filename, file_content in unique_pdf_files.items():
         try:
-            # Send processing update
             processing_response = schemas.SendMessageResponse(
                 id=request_id,
                 result=schemas.Message(
@@ -205,10 +194,8 @@ async def stream_pdf_processing(
             )
             yield f"data: {json.dumps(processing_response.model_dump())}\n\n"
 
-            # Simulate some processing delay
             await asyncio.sleep(0.1)
 
-            # Decode and process PDF
             pdf_b64 = decode_base64_file(file_content)
             pdf_text = extract_pdf_text(pdf_b64)
 
@@ -224,7 +211,6 @@ async def stream_pdf_processing(
                 )
                 yield f"data: {json.dumps(error_response.model_dump())}\n\n"
             else:
-                # Send the converted markdown
                 success_response = schemas.SendMessageResponse(
                     id=request_id,
                     result=schemas.Message(
@@ -237,6 +223,7 @@ async def stream_pdf_processing(
                 yield f"data: {json.dumps(success_response.model_dump())}\n\n"
 
         except Exception as e:
+            log.warning("streaming_conversion_error", file_name=filename, error=str(e))
             error_response = schemas.SendMessageResponse(
                 id=request_id,
                 result=schemas.Message(
@@ -276,15 +263,13 @@ async def handle_json_rpc(
                 error=schemas.JSONRPCError(code=404, message="Task not found"),
             )
 
-    # Handle message/send and message/stream
     if isinstance(request, (schemas.SendMessageRequest, schemas.StreamMessageRequest)):
         content_parts = extract_message_parts(
             request, mime_type_filter=["application/pdf", "pdf"]
         )
-        
+
         user_input = content_parts.joined_text
 
-        # No PDF files detected
         if len(content_parts.file_content_list) == 0:
             return schemas.SendMessageResponse(
                 id=request.id,
@@ -295,27 +280,25 @@ async def handle_json_rpc(
                     parts=[
                         schemas.TextPart(
                             text="No PDF files detected. Please upload a PDF file to convert to Markdown."
-                        ),
+                        )
                     ],
                 ),
             )
-        
 
         webhook_details = extract_webhook_details(request.params)
 
-        # If streaming request or no webhook, stream the response
         if isinstance(request, schemas.StreamMessageRequest) or not webhook_details.url:
             return StreamingResponse(
-                stream_pdf_processing(content_parts.file_content_list, user_input, request.id),
+                stream_pdf_processing(
+                    content_parts.file_content_list, user_input, request.id
+                ),
                 media_type="text/plain",
             )
-
-        # Webhook present - create task and process in background
         else:
             task_id = uuid4().hex
             context_id = request.params.message.context_id or uuid4().hex
 
-            print(f"Handling task {task_id}")
+            log.info("task_submitted", task_id=task_id, context_id=context_id)
 
             task = schemas.Task(
                 id=task_id,
@@ -327,10 +310,8 @@ async def handle_json_rpc(
                 history=[request.params.message],
             )
 
-            # Store task
             active_tasks[task_id] = task
 
-            # Start background processing
             background_tasks.add_task(
                 process_pdf_task_background,
                 task_id,
@@ -339,14 +320,13 @@ async def handle_json_rpc(
                 webhook_details,
             )
 
-            # Return task immediately
             return schemas.SendMessageResponse(id=request.id, result=task)
 
-    # Unknown request type
     return schemas.JSONRPCResponse(
         id=getattr(request, "id", None),
         error=schemas.JSONRPCError(code=400, message="Invalid request method"),
     )
+
 
 @app.get("/.well-known/agent.json")
 def agent_card():

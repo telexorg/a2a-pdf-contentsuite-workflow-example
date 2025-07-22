@@ -10,4 +10,5 @@ dependencies = [
     "pydantic-ai>=0.4.4",
     "pymupdf>=1.26.3",
     "python-dotenv>=1.1.1",
+    "structlog>=25.4.0",
 ]

@@ -2,7 +2,7 @@ import httpx
 import base64
 from typing import NamedTuple, Optional
 import models.schemas as schemas
-
+from common.logconfig import log
 
 class MessageParts(NamedTuple):
     joined_text: str
@@ -82,3 +82,35 @@ def extract_webhook_details(params: schemas.MessageSendParams) -> WebhookDetails
     return WebhookDetails(
         url=webhook_url, is_telex=not (not (api_key)), api_key=api_key
     )
+
+
+async def send_webhook_notification(
+    webhook_details: WebhookDetails, task: schemas.Task
+):
+    """Send task update to webhook URL."""
+    try:
+        async with httpx.AsyncClient(follow_redirects=True) as client:
+            headers = {"Content-Type": "application/json"}
+            if webhook_details.is_telex:
+                headers["X-TELEX-API-KEY"] = webhook_details.api_key
+
+            a2a_response = schemas.SendMessageResponse(result=task)
+
+            response = await client.post(
+                webhook_details.url,
+                json=a2a_response.model_dump(by_alias=True),
+                headers=headers,
+                timeout=30.0,
+            )
+            log.info(
+                "webhook_sent", status_code=response.status_code, response=response.text
+            )
+
+            response.raise_for_status()
+
+    except Exception as e:
+        log.error(
+            "webhook_failed",
+            error=str(e),
+            response_text=getattr(locals().get("response"), "text", None),
+        )

@@ -13,15 +13,21 @@ import io
 from datetime import datetime
 from typing import AsyncGenerator, Union
 
+from common.logconfig import log
+
 # For text-to-speech - using built-in wave module
 import wave
-import struct
 
 import models.schemas as schemas
 from common.ai import model
 from core.config import config
 from common.agent_details import get_agent_response
-from common.a2a import extract_message_parts
+from common.a2a import (
+    WebhookDetails,
+    extract_message_parts,
+    extract_webhook_details,
+    send_webhook_notification
+)
 
 
 class TextToSpeechAgentOutput(BaseModel):
@@ -128,26 +134,11 @@ async def convert_text_to_speech_gemini(
         raise ValueError(f"Failed to convert text to speech with Gemini: {str(e)}")
 
 
-async def send_webhook_notification(webhook_url: str, task: schemas.Task):
-    """Send task update to webhook URL."""
-    try:
-        async with httpx.AsyncClient(follow_redirects=True) as client:
-            response = await client.post(
-                webhook_url,
-                json=task.model_dump(),
-                headers={"Content-Type": "application/json"},
-                timeout=30.0,
-            )
-            response.raise_for_status()
-    except Exception as e:
-        print(f"Failed to send webhook notification: {e}")
-
-
 async def process_tts_task_background(
     task_id: str,
     text_content: str,
     user_input: str,
-    webhook_url: str,
+    webhook_details: WebhookDetails,
     options: dict,
     api_key: str,
 ):
@@ -160,7 +151,7 @@ async def process_tts_task_background(
         )
 
         # Send working status via webhook
-        await send_webhook_notification(webhook_url, task)
+        await send_webhook_notification(webhook_details, task)
 
         response_parts = []
         artifacts = []
@@ -221,7 +212,7 @@ async def process_tts_task_background(
         task.artifacts = artifacts
 
         # Send final webhook notification
-        await send_webhook_notification(webhook_url, task)
+        await send_webhook_notification(webhook_details, task)
 
     except Exception as e:
         # Update task with failure
@@ -240,7 +231,7 @@ async def process_tts_task_background(
                 timestamp=datetime.now(),
             )
 
-            await send_webhook_notification(webhook_url, active_tasks[task_id])
+            await send_webhook_notification(webhook_details, active_tasks[task_id])
 
 
 async def stream_tts_processing(
@@ -423,15 +414,10 @@ async def handle_json_rpc(
             text_to_convert = user_input  # Fallback to original input
 
         # Check for webhook configuration
-        webhook_url = None
-        if (
-            request.params.configuration
-            and request.params.configuration.push_notification_config
-        ):
-            webhook_url = request.params.configuration.push_notification_config.url
+        webhook_details = extract_webhook_details(request.params)
 
         # If streaming request or no webhook, stream the response
-        if isinstance(request, schemas.StreamMessageRequest) or not webhook_url:
+        if isinstance(request, schemas.StreamMessageRequest) or not webhook_details.url:
             return StreamingResponse(
                 stream_tts_processing(
                     text_to_convert, user_input, request.id, tts_options, api_key
@@ -463,7 +449,7 @@ async def handle_json_rpc(
                 task_id,
                 text_to_convert,
                 user_input,
-                webhook_url,
+                webhook_details,
                 tts_options,
                 api_key,
             )
