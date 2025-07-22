@@ -1,4 +1,5 @@
 import os
+from typing import Literal
 from dataclasses import dataclass
 from dotenv import load_dotenv
 
@@ -50,6 +51,8 @@ class Config:
     text_to_speech: TextToSpeechAgentConfig
 
     common_model = CommonModel
+
+    app_env: Literal["local", "staging", "production"] = os.getenv("APP_ENV", "staging")
 
     host = os.getenv("HOST", "127.0.0.1")
     port = int(os.getenv("PORT", "5700"))

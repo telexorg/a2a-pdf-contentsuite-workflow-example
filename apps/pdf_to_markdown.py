@@ -18,7 +18,7 @@ import models.schemas as schemas
 from common.ai import model
 from core.config import config
 from common.agent_details import get_agent_response
-from common.a2a import extract_message_parts
+from common.a2a import WebhookDetails, extract_message_parts, download_file_content, extract_webhook_details
 
 md = MarkdownIt("commonmark", {"breaks": True, "html": True})
 
@@ -76,23 +76,33 @@ def extract_pdf_text(pdf_bytes_b64: str) -> str:
         return f"Error extracting text from PDF: {str(e)}"
 
 
-async def send_webhook_notification(webhook_url: str, task: schemas.Task):
+async def send_webhook_notification(webhook_details: WebhookDetails, task: schemas.Task):
     """Send task update to webhook URL."""
     try:
         async with httpx.AsyncClient(follow_redirects=True) as client:
+            headers = {"Content-Type": "application/json"}
+
+            if webhook_details.is_telex:
+                headers["X-TELEX-API-KEY"] = webhook_details.api_key
+
+            a2a_response = schemas.SendMessageResponse(result=task)
+
             response = await client.post(
-                webhook_url,
-                json=task.model_dump(),
-                headers={"Content-Type": "application/json"},
+                webhook_details.url,
+                json=a2a_response.model_dump(by_alias=True),
+                headers=headers,
                 timeout=30.0,
             )
+            print(response.text)
+
             response.raise_for_status()
     except Exception as e:
-        print(f"Failed to send webhook notification: {e}")
+        print(f"Failed to send webhook notification: {e}, {response.text}")
+
 
 
 async def process_pdf_task_background(
-    task_id: str, unique_pdf_files: dict, user_input: str, webhook_url: str
+    task_id: str, unique_pdf_files: list[schemas.FileContent], user_input: str, webhook_details: WebhookDetails
 ):
     """Background task to process PDF files and send webhook."""
     try:
@@ -102,16 +112,14 @@ async def process_pdf_task_background(
             state=schemas.TaskState.working, timestamp=datetime.now()
         )
 
-        # Send working status via webhook
-        await send_webhook_notification(webhook_url, task)
-
         response_parts = []
         artifacts = []
 
-        for filename, file_content in unique_pdf_files.items():
+        for file_content in unique_pdf_files:
             try:
                 # Decode the base64 file content
-                pdf_b64 = decode_base64_file(file_content)
+                base64_string = file_content.bytes if file_content.bytes else await download_file_content(file_content.uri)
+                pdf_b64 = decode_base64_file(base64_string)
 
                 # Extract text from PDF
                 pdf_text = extract_pdf_text(pdf_b64)
@@ -122,8 +130,8 @@ async def process_pdf_task_background(
 
                 # Create artifact with the markdown content
                 artifact = schemas.Artifact(
-                    name=f"{filename}_markdown",
-                    description=f"Markdown conversion of {filename}",
+                    name=f"{file_content.name}.md",
+                    description=f"Markdown conversion of {file_content.name}",
                     parts=[schemas.TextPart(text=pdf_text)],
                     index=len(artifacts),
                 )
@@ -131,13 +139,13 @@ async def process_pdf_task_background(
 
                 response_parts.append(
                     schemas.TextPart(
-                        text=f"✅ Successfully converted {filename} to markdown"
+                        text=f"✅ Successfully converted {file_content.name} to markdown"
                     )
                 )
 
             except Exception as e:
                 response_parts.append(
-                    schemas.TextPart(text=f"❌ Error processing {filename}: {str(e)}")
+                    schemas.TextPart(text=f"❌ Error processing {file_content.name}: {str(e)}")
                 )
 
         # Update task with completion
@@ -157,7 +165,7 @@ async def process_pdf_task_background(
         task.artifacts = artifacts
 
         # Send final webhook notification
-        await send_webhook_notification(webhook_url, task)
+        await send_webhook_notification(webhook_details, task)
 
     except Exception as e:
         # Update task with failure
@@ -176,7 +184,7 @@ async def process_pdf_task_background(
                 timestamp=datetime.now(),
             )
 
-            await send_webhook_notification(webhook_url, active_tasks[task_id])
+            await send_webhook_notification(webhook_details, active_tasks[task_id])
 
 
 async def stream_pdf_processing(
@@ -271,17 +279,13 @@ async def handle_json_rpc(
     # Handle message/send and message/stream
     if isinstance(request, (schemas.SendMessageRequest, schemas.StreamMessageRequest)):
         content_parts = extract_message_parts(
-            request, mime_type_filter=["application/pdf"], download_files=True
+            request, mime_type_filter=["application/pdf", "pdf"]
         )
-        unique_pdf_files = defaultdict(str)
-
-        for part in content_parts.file_parts:
-            unique_pdf_files[part.name] += part.bytes
-
+        
         user_input = content_parts.joined_text
 
         # No PDF files detected
-        if len(unique_pdf_files.keys()) == 0:
+        if len(content_parts.file_content_list) == 0:
             return schemas.SendMessageResponse(
                 id=request.id,
                 result=schemas.Message(
@@ -295,19 +299,14 @@ async def handle_json_rpc(
                     ],
                 ),
             )
+        
 
-        # PDF files present - check for webhook configuration
-        webhook_url = None
-        if (
-            request.params.configuration
-            and request.params.configuration.push_notification_config
-        ):
-            webhook_url = request.params.configuration.push_notification_config.url
+        webhook_details = extract_webhook_details(request.params)
 
         # If streaming request or no webhook, stream the response
-        if isinstance(request, schemas.StreamMessageRequest) or not webhook_url:
+        if isinstance(request, schemas.StreamMessageRequest) or not webhook_details.url:
             return StreamingResponse(
-                stream_pdf_processing(unique_pdf_files, user_input, request.id),
+                stream_pdf_processing(content_parts.file_content_list, user_input, request.id),
                 media_type="text/plain",
             )
 
@@ -315,6 +314,8 @@ async def handle_json_rpc(
         else:
             task_id = uuid4().hex
             context_id = request.params.message.context_id or uuid4().hex
+
+            print(f"Handling task {task_id}")
 
             task = schemas.Task(
                 id=task_id,
@@ -333,9 +334,9 @@ async def handle_json_rpc(
             background_tasks.add_task(
                 process_pdf_task_background,
                 task_id,
-                unique_pdf_files,
+                content_parts.file_content_list,
                 user_input,
-                webhook_url,
+                webhook_details,
             )
 
             # Return task immediately
@@ -347,11 +348,13 @@ async def handle_json_rpc(
         error=schemas.JSONRPCError(code=400, message="Invalid request method"),
     )
 
-
 @app.get("/.well-known/agent.json")
 def agent_card():
+    name_suffix = datetime.now() if config.app_env == "local" else ""
+    agent_name = f"PDF to Markdown agent {name_suffix}"
+
     return schemas.AgentCard(
-        name=f"PDF to Markdown agent",
+        name=agent_name.strip(),
         description="An agent that converts PDF to markdown.",
         url=config.pdf_to_markdown.base_url,
         provider=schemas.AgentProvider(

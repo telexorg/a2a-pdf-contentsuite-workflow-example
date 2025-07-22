@@ -477,11 +477,13 @@ async def handle_json_rpc(
         error=schemas.JSONRPCError(code=400, message="Invalid request method"),
     )
 
-
 @app.get("/.well-known/agent.json")
 def agent_card():
+    name_suffix = datetime.now() if config.app_env == "local" else ""
+    agent_name = f"Text to speech agent {name_suffix}"
+
     return schemas.AgentCard(
-        name=f"Text to Speech agent",
+        name=agent_name.strip(),
         description="An agent that converts text to speech audio.",
         url=config.text_to_speech.base_url,
         provider=schemas.AgentProvider(
