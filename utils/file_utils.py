@@ -1,5 +1,7 @@
-import base64
 import os
+import base64
+from utils.minio import minio_client
+from core.config import config
 
 def save_base64_to_file(base64_str: str, output_path: str) -> None:
     """

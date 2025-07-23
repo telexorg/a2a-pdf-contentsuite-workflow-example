@@ -58,6 +58,12 @@ class Config:
     port = int(os.getenv("PORT", "5700"))
     base_path = os.getenv("BASE_PATH", "")
 
+    minio_endpoint = os.getenv("MINIO_ENDPOINT")
+    minio_bucket_name = os.getenv("MINIO_BUCKET_NAME")
+    minio_bucket_access_key = os.getenv("MINIO_BUCKET_ACCESS_KEY")
+    minio_bucket_prefix = os.getenv("MINIO_BUCKET_PREFIX")
+    minio_bucket_secret_key=os.getenv("MINIO_BUKCET_SECRET_KEY")
+
 def create_config() -> Config:
     base_url = os.getenv("BASE_URL", "http://localhost:5700")
 
