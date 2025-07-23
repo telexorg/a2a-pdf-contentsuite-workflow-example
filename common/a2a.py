@@ -55,11 +55,13 @@ def extract_message_parts(
 async def download_file_content(uri: str) -> str:
     """
     Downloads file content from URI and returns it as a base64-encoded string.
+    We allow for files that take a minute to download for now
     """
     try:
         async with httpx.AsyncClient(timeout=60.0) as client:
             response = await client.get(uri)
             response.raise_for_status()
+            log.info(f"Successfully downloaded remote file from: {uri}")
             return base64.b64encode(response.content).decode()
     except Exception as e:
         raise RuntimeError(f"Failed to download file from {uri}: {str(e)}")

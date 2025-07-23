@@ -1,6 +1,6 @@
 import uvicorn
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from core.agent_apps import AGENT_APPS
@@ -21,6 +21,10 @@ def read_main(request: Request):
 
 
 for agent in AGENT_APPS:
+    @app.post(f"/{agent.id}")
+    async def redirect_to_agent(agent_id: str = agent.id):
+        return RedirectResponse(url=f"/{agent_id}/", status_code=307)
+    
     app.mount(f"/{agent.id}", agent.app)
 
 app.mount("/static", StaticFiles(directory="static"), name="static")

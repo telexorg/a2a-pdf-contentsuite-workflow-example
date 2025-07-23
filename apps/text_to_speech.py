@@ -12,6 +12,7 @@ import json
 import io
 from datetime import datetime
 from typing import AsyncGenerator, Union
+from utils.file_utils import save_base64_to_file
 
 from common.logconfig import log
 
@@ -164,18 +165,21 @@ async def process_tts_task_background(
                 api_key=api_key,
             )
 
+            save_base64_to_file(audio_base64, "output/audio/text_to_speech_output.wav")
+
             # Create artifact with the audio content
             artifact = schemas.Artifact(
                 name="text_to_speech_audio",
                 description=f"Audio conversion of text ({duration:.1f}s)",
                 parts=[
-                    schemas.FilePart(
-                        file=schemas.FileContent(
-                            bytes=f"data:audio/wav;base64,{audio_base64}",
-                            mime_type="audio/wav",
-                            duration_seconds=duration,
-                        )
-                    )
+                    schemas.TextPart(text="hehe")
+                    # schemas.FilePart(
+                    #     file=schemas.FileContent(
+                    #         bytes=f"data:audio/wav;base64,{audio_base64}",
+                    #         mime_type="audio/wav",
+                    #         duration_seconds=duration,
+                    #     )
+                    # )
                 ],
                 index=0,
             )

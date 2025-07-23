@@ -85,11 +85,12 @@ def extract_pdf_text(pdf_bytes_b64: str) -> str:
 
 async def process_pdf_task_background(
     task_id: str,
-    unique_pdf_files: list[schemas.FileContent],
+    pdf_filecontent_list: list[schemas.FileContent],
     user_input: str,
     webhook_details: WebhookDetails,
 ):
     """Background task to process PDF files and send webhook."""
+
     try:
         task = active_tasks[task_id]
         task.status = schemas.TaskStatus(
@@ -99,7 +100,7 @@ async def process_pdf_task_background(
         response_parts = []
         artifacts = []
 
-        for file_content in unique_pdf_files:
+        for file_content in pdf_filecontent_list:
             try:
                 log.info("processing_pdf", file_name=file_content.name)
 
@@ -178,10 +179,10 @@ async def process_pdf_task_background(
 
 
 async def stream_pdf_processing(
-    unique_pdf_files: dict, user_input: str, request_id: str
+    pdf_filecontent_list: list[schemas.FileContent], user_input: str, request_id: str
 ) -> AsyncGenerator[str, None]:
     """Stream PDF processing results as JSON-RPC responses."""
-    for filename, file_content in unique_pdf_files.items():
+    for file_content in pdf_filecontent_list:
         try:
             processing_response = schemas.SendMessageResponse(
                 id=request_id,
@@ -189,14 +190,17 @@ async def stream_pdf_processing(
                     message_id=uuid4().hex,
                     context_id=uuid4().hex,
                     role="agent",
-                    parts=[schemas.TextPart(text=f"Processing PDF: **{filename}**")],
+                    parts=[schemas.TextPart(text=f"Processing PDF: **{file_content.name}**")],
                 ),
             )
             yield f"data: {json.dumps(processing_response.model_dump())}\n\n"
 
             await asyncio.sleep(0.1)
 
-            pdf_b64 = decode_base64_file(file_content)
+            base64_string = file_content.bytes or await download_file_content(
+                file_content.uri
+            )
+            pdf_b64 = decode_base64_file(base64_string)
             pdf_text = extract_pdf_text(pdf_b64)
 
             if pdf_text.startswith("Error"):
@@ -223,7 +227,7 @@ async def stream_pdf_processing(
                 yield f"data: {json.dumps(success_response.model_dump())}\n\n"
 
         except Exception as e:
-            log.warning("streaming_conversion_error", file_name=filename, error=str(e))
+            log.warning("streaming_conversion_error", file_name=file_content.name, error=str(e))
             error_response = schemas.SendMessageResponse(
                 id=request_id,
                 result=schemas.Message(
@@ -232,7 +236,7 @@ async def stream_pdf_processing(
                     role="agent",
                     parts=[
                         schemas.TextPart(
-                            text=f"❌ Error processing {filename}: {str(e)}"
+                            text=f"❌ Error processing {file_content.name}: {str(e)}"
                         )
                     ],
                 ),
@@ -344,7 +348,7 @@ def agent_card():
         version="1.0.0",
         documentationUrl=f"{config.pdf_to_markdown.base_url}/docs",
         capabilities=schemas.AgentCapabilities(
-            streaming=True,
+            streaming=False,
             pushNotifications=True,
             stateTransitionHistory=True,
         ),
