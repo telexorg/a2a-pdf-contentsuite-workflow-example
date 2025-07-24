@@ -15,22 +15,23 @@ from common.logconfig import log
 import models.schemas as schemas
 from .tts_converter import convert_text_to_speech_gemini
 
+
 async def process_tts_task_background(
     task_id: str,
-    text_content: str,
     user_input: str,
     webhook_details,
     options: dict,
     api_key: str,
-    active_tasks: dict
+    active_tasks: dict,
 ):
     try:
         task = active_tasks[task_id]
-        task.status = schemas.TaskStatus(state=schemas.TaskState.working, timestamp=datetime.now())
-        await send_webhook_notification(webhook_details, task)
+        task.status = schemas.TaskStatus(
+            state=schemas.TaskState.working, timestamp=datetime.now()
+        )
 
         audio_base64, duration = await convert_text_to_speech_gemini(
-            text_content, options.get("voice_name", "Kore"), api_key
+            user_input, options.get("voice_name", "Kore"), api_key
         )
 
         file_name = f"text_to_speech_output_{uuid4().hex}.wav"
@@ -64,7 +65,7 @@ async def process_tts_task_background(
                         mime_type="audio/wav",
                         duration_seconds=duration,
                     )
-                )
+                ),
             ],
             index=0,
         )
@@ -103,14 +104,17 @@ async def process_tts_task_background(
             )
             await send_webhook_notification(webhook_details, task)
 
+
 async def stream_tts_processing(
-    text_content: str, user_input: str, request_id: str, options: dict, api_key: str
+    user_input: str, request_id: str, options: dict, api_key: str
 ) -> AsyncGenerator[str, None]:
     awaitable_sleep = asyncio.sleep(0.5)
     yield f"data: {json.dumps({'id': request_id, 'result': {'parts': [{'text': 'Converting text to speech...'}]}})}\n\n"
     await awaitable_sleep
     try:
-        audio_base64, duration = await convert_text_to_speech_gemini(text_content, options["voice_name"], api_key)
+        audio_base64, duration = await convert_text_to_speech_gemini(
+            user_input, options["voice_name"], api_key
+        )
         yield f"data: {json.dumps({'id': request_id, 'result': {'parts': [{'text': f'Success ✅ ({duration:.1f}s)'}, {'audio': {'bytes': f'data:audio/wav;base64,{audio_base64}', 'mime_type': 'audio/wav', 'duration_seconds': duration}}]}})}\n\n"
     except Exception as e:
         yield f"data: {json.dumps({'id': request_id, 'result': {'parts': [{'text': f'❌ Error: {str(e)}'}]}})}\n\n"

@@ -4,8 +4,8 @@ from apps import (
     mailer,
     podcast_creator,
     spotify_uploader,
+    text_to_speech
 )
-import apps.text_to_speech as text_to_speech
 
 from core.agent_list import get_agent_config_by_id
 

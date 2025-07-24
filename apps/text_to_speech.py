@@ -81,23 +81,12 @@ async def handle_json_rpc(
 
         tts_options = parse_tts_options(user_input)
         api_key = config.common_model.api_key
-        text_to_convert = user_input
-
-        instruction_words = [
-            "convert to speech", "text to speech", "tts", "speak this", "read this",
-            "make audio", "generate speech", "alloy", "echo", "fable", "onyx", "nova",
-            "shimmer", "kore", "male", "female", "man", "woman", "voice"
-        ]
-        for word in instruction_words:
-            text_to_convert = text_to_convert.replace(word, "").strip()
-
-        text_to_convert = " ".join(text_to_convert.split()) or user_input
         webhook_details = extract_webhook_details(request.params)
 
         if isinstance(request, schemas.StreamMessageRequest) or not webhook_details.url:
             return StreamingResponse(
                 stream_tts_processing(
-                    text_to_convert, user_input, request.id, tts_options, api_key
+                    user_input, request.id, tts_options, api_key
                 ),
                 media_type="text/plain",
             )
@@ -118,7 +107,6 @@ async def handle_json_rpc(
         background_tasks.add_task(
             process_tts_task_background,
             task_id,
-            text_to_convert,
             user_input,
             webhook_details,
             tts_options,
