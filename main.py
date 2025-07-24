@@ -22,14 +22,14 @@ def read_main(request: Request):
 
 for agent in AGENT_APPS:
     @app.post(f"/{agent.id}")
-    async def redirect_to_agent(agent_id: str = agent.id):
+    async def redirect_get_to_agent(agent_id: str = agent.id):
         return RedirectResponse(url=f"/{agent_id}/", status_code=307)
 
     @app.get(f"/{agent.id}")
-    async def redirect_to_agent(agent_id: str = agent.id):
+    async def redirect_post_to_agent(agent_id: str = agent.id):
         return RedirectResponse(url=f"/{agent_id}/", status_code=307)
     
-    app.mount(f"/{agent.id}", agent.app)
+    app.mount(f"/{agent.id}/", agent.app)
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 app.mount("/request-handler", app=request_handler_app.app)
