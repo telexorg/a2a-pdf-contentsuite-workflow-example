@@ -8,7 +8,7 @@ from common.agent_details import get_agent_response
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
 
-@app.get("/", response_class=HTMLResponse)
+@app.get("/page.html", response_class=HTMLResponse)
 def read_pdf_to_md(request: Request):
     return get_agent_response("podcast-creator", request)
 
