@@ -37,7 +37,7 @@ text_to_speech_agent = Agent(
     ),
 )
 
-@app.get("/", response_class=HTMLResponse)
+@app.get("/page.html", response_class=HTMLResponse)
 def read_tts_agent(request: Request):
     return get_agent_response("text-to-speech", request)
 

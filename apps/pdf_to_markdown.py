@@ -244,7 +244,7 @@ async def stream_pdf_processing(
             yield f"data: {json.dumps(error_response.model_dump())}\n\n"
 
 
-@app.get("/", response_class=HTMLResponse)
+@app.get("/page.html" , response_class=HTMLResponse)
 def read_pdf_to_md(request: Request):
     return get_agent_response("pdf-to-markdown", request)
 
