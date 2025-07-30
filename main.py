@@ -20,21 +20,9 @@ def read_main(request: Request):
     )
 
 
-def register_agent_routes(agent):
-    prefix = f"/{agent.id}"
-
-    @app.get(prefix)
-    async def redirect_to_slash():
-        return RedirectResponse(url=f"{prefix}/", status_code=307)
-
-    @app.post(prefix)
-    async def redirect_post_to_slash():
-        return RedirectResponse(url=f"{prefix}/", status_code=307)
-
-    app.mount(f"{prefix}/", agent.app)
 
 for agent in AGENT_APPS:
-    register_agent_routes(agent)
+    app.include_router(agent.router)
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 app.mount("/request-handler", app=request_handler_app.app)

@@ -7,7 +7,7 @@ from typing import AsyncGenerator, Union
 
 import pymupdf
 import httpx
-from fastapi import FastAPI, Request
+from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.background import BackgroundTasks
 from markdown_it import MarkdownIt
@@ -46,7 +46,7 @@ pdf_to_markdown_agent = Agent(
     ),
 )
 
-app = FastAPI()
+router = APIRouter(prefix="/pdf-to-markdown")
 active_tasks: dict[str, schemas.Task] = {}
 
 
@@ -244,12 +244,12 @@ async def stream_pdf_processing(
             yield f"data: {json.dumps(error_response.model_dump())}\n\n"
 
 
-@app.get("/page.html" , response_class=HTMLResponse)
+@router.get("/page.html" , response_class=HTMLResponse)
 def read_pdf_to_md(request: Request):
     return get_agent_response("pdf-to-markdown", request)
 
 
-@app.post("/")
+@router.post("/")
 async def handle_json_rpc(
     request: Union[
         schemas.SendMessageRequest, schemas.StreamMessageRequest, schemas.GetTaskRequest
@@ -332,7 +332,7 @@ async def handle_json_rpc(
     )
 
 
-@app.get("/.well-known/agent.json")
+@router.get("/.well-known/agent.json")
 def agent_card():
     name_suffix = datetime.now() if config.app_env == "local" else ""
     agent_name = f"PDF to Markdown agent {name_suffix}"

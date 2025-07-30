@@ -1,6 +1,6 @@
 from pydantic import BaseModel, ConfigDict
 from uuid import uuid4
-from fastapi import FastAPI, Request, BackgroundTasks
+from fastapi import APIRouter, Request, BackgroundTasks
 from fastapi.responses import HTMLResponse, StreamingResponse
 from typing import Union
 
@@ -18,7 +18,7 @@ from core.config import config
 from services.task_handler import process_tts_task_background, stream_tts_processing
 from utils.options import parse_tts_options
 
-app = FastAPI()
+router = APIRouter(prefix="/text-to-speech")
 active_tasks: dict[str, schemas.Task] = {}
 
 
@@ -37,12 +37,12 @@ text_to_speech_agent = Agent(
     ),
 )
 
-@app.get("/page.html", response_class=HTMLResponse)
+@router.get("/page.html", response_class=HTMLResponse)
 def read_tts_agent(request: Request):
     return get_agent_response("text-to-speech", request)
 
 
-@app.post("/")
+@router.post("/")
 async def handle_json_rpc(
     request: Union[
         schemas.SendMessageRequest, schemas.StreamMessageRequest, schemas.GetTaskRequest
@@ -121,7 +121,7 @@ async def handle_json_rpc(
     )
 
 
-@app.get("/.well-known/agent.json")
+@router.get("/.well-known/agent.json")
 def agent_card():
     from datetime import datetime
     name_suffix = datetime.now() if config.app_env == "local" else ""
