@@ -30,9 +30,7 @@ class ForceSlashRedirectMiddleware(BaseHTTPMiddleware):
 app = FastAPI(root_path=config.base_path)
 app.add_middleware(ForceSlashRedirectMiddleware)
 
-
 templates = Jinja2Templates(directory="templates")
-
 
 @app.get("/", response_class=HTMLResponse)
 def read_main(request: Request):
@@ -42,8 +40,10 @@ def read_main(request: Request):
     )
 
 for agent in AGENT_APPS:
-    agent_base_path = f"/{config.base_path}" if config.base_path else ""
-    app.include_router(agent.router, prefix=f"{agent_base_path}/{agent.id}")
+    agent_base_path = f"{config.base_path}" if config.base_path else ""
+    full_prefix = f"{agent_base_path}/{agent.id}"
+
+    app.include_router(agent.router, prefix=full_prefix)
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 app.mount("/request-handler", app=request_handler_app.app)

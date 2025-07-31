@@ -56,7 +56,7 @@ class Config:
 
     host = os.getenv("HOST", "127.0.0.1")
     port = int(os.getenv("PORT", "5700"))
-    base_path = os.getenv("BASE_PATH", "")
+    base_path = os.getenv("BASE_PATH", "").rstrip("/")
 
     minio_endpoint = os.getenv("MINIO_ENDPOINT")
     minio_bucket_name = os.getenv("MINIO_BUCKET_NAME")
