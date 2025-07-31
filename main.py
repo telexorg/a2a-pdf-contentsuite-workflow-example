@@ -7,7 +7,29 @@ from core.agent_apps import AGENT_APPS
 from core.config import config
 import apps.request_handler as request_handler_app
 
+from fastapi.responses import RedirectResponse
+from starlette.middleware.base import BaseHTTPMiddleware
+
+class ForceSlashRedirectMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        scope = request.scope
+        path = scope["path"]
+
+        # Only redirect when:
+        # - No trailing slash
+        # - Path with slash exists in app.routes
+        if not path.endswith("/"):
+            new_path = path + "/"
+            for route in request.app.routes:
+                if hasattr(route, "path") and route.path == new_path:
+                    # Maintain method & body via 307
+                    return RedirectResponse(url=new_path, status_code=307)
+
+        return await call_next(request)
+
 app = FastAPI(root_path=config.base_path)
+app.add_middleware(ForceSlashRedirectMiddleware)
+
 
 templates = Jinja2Templates(directory="templates")
 
@@ -22,7 +44,7 @@ def read_main(request: Request):
 
 
 for agent in AGENT_APPS:
-    app.include_router(agent.router)
+    app.include_router(agent.router, prefix=f"/{agent.id}")
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 app.mount("/request-handler", app=request_handler_app.app)

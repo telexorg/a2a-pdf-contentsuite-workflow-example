@@ -42,7 +42,8 @@ def read_tts_agent(request: Request):
     return get_agent_response("text-to-speech", request)
 
 
-@router.post("/")
+@router.post("", include_in_schema=False)
+@router.post("/", include_in_schema=True)
 async def handle_json_rpc(
     request: Union[
         schemas.SendMessageRequest, schemas.StreamMessageRequest, schemas.GetTaskRequest
