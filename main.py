@@ -41,8 +41,8 @@ def read_main(request: Request):
     )
 
 for agent in AGENT_APPS:
-    agent_base_path = f"{config.base_path}" if config.base_path else ""
-    full_prefix = f"{agent_base_path}/{agent.id}"
+    # agent_base_path = f"{config.base_path}" if config.base_path else ""
+    full_prefix = f"/{agent.id}"
 
     app.mount(full_prefix, agent.app)
     # app.include_router(agent.router, prefix=full_prefix)
