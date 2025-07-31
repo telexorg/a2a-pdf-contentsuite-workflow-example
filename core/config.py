@@ -66,15 +66,18 @@ class Config:
 
 def create_config() -> Config:
     base_url = os.getenv("BASE_URL", "http://localhost:5700")
+    base_path = os.getenv("BASE_PATH", "").rstrip("/")
+
+    full_prefix = f"{base_url}{base_path}"
 
     return Config(
         base_url=base_url,
-        pdf_to_markdown=PDFToMarkdownConfig(base_url=f"{base_url}/pdf-to-markdown/"),
-        pptx_creator=PPTXCreatorConfig(base_url=f"{base_url}/pptx-creator/"),
-        mailer=MailerConfig(base_url=f"{base_url}/mailer/"),
-        podcast_creator=PodcastCreatorConfig(base_url=f"{base_url}/podcast-creator/"),
-        spotify_uploader=SpotifyUploaderConfig(base_url=f"{base_url}/spotify-uploader/"),
-        text_to_speech=TextToSpeechAgentConfig(base_url=f"{base_url}/text-to-speech/"),
+        pdf_to_markdown=PDFToMarkdownConfig(base_url=f"{full_prefix}/pdf-to-markdown/"),
+        pptx_creator=PPTXCreatorConfig(base_url=f"{full_prefix}/pptx-creator/"),
+        mailer=MailerConfig(base_url=f"{full_prefix}/mailer/"),
+        podcast_creator=PodcastCreatorConfig(base_url=f"{full_prefix}/podcast-creator/"),
+        spotify_uploader=SpotifyUploaderConfig(base_url=f"{full_prefix}/spotify-uploader/"),
+        text_to_speech=TextToSpeechAgentConfig(base_url=f"{full_prefix}/text-to-speech/"),
     )
 
 
