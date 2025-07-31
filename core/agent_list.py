@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Literal, Optional
 from fastapi import APIRouter
+from starlette.types import ASGIApp
 
 AgentId = Literal[
     "pdf-to-markdown",
@@ -18,6 +19,7 @@ class AgentConfig:
     description: str
     default_text: str
     router: Optional[APIRouter] = None
+    app: Optional[ASGIApp] = None
 
 AGENT_CONFIGS: tuple[AgentConfig, ...] = (
     AgentConfig(

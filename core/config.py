@@ -69,12 +69,12 @@ def create_config() -> Config:
 
     return Config(
         base_url=base_url,
-        pdf_to_markdown=PDFToMarkdownConfig(base_url=f"{base_url}/pdf-to-markdown"),
-        pptx_creator=PPTXCreatorConfig(base_url=f"{base_url}/pptx-creator"),
-        mailer=MailerConfig(base_url=f"{base_url}/mailer"),
-        podcast_creator=PodcastCreatorConfig(base_url=f"{base_url}/podcast-creator"),
-        spotify_uploader=SpotifyUploaderConfig(base_url=f"{base_url}/spotify-uploader"),
-        text_to_speech=TextToSpeechAgentConfig(base_url=f"{base_url}/text-to-speech"),
+        pdf_to_markdown=PDFToMarkdownConfig(base_url=f"{base_url}/pdf-to-markdown/"),
+        pptx_creator=PPTXCreatorConfig(base_url=f"{base_url}/pptx-creator/"),
+        mailer=MailerConfig(base_url=f"{base_url}/mailer/"),
+        podcast_creator=PodcastCreatorConfig(base_url=f"{base_url}/podcast-creator/"),
+        spotify_uploader=SpotifyUploaderConfig(base_url=f"{base_url}/spotify-uploader/"),
+        text_to_speech=TextToSpeechAgentConfig(base_url=f"{base_url}/text-to-speech/"),
     )
 
 

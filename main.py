@@ -10,6 +10,7 @@ import apps.request_handler as request_handler_app
 from fastapi.responses import RedirectResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
+# only works for router
 class ForceSlashRedirectMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         scope = request.scope
@@ -43,7 +44,8 @@ for agent in AGENT_APPS:
     agent_base_path = f"{config.base_path}" if config.base_path else ""
     full_prefix = f"{agent_base_path}/{agent.id}"
 
-    app.include_router(agent.router, prefix=full_prefix)
+    app.mount(full_prefix, agent.app)
+    # app.include_router(agent.router, prefix=full_prefix)
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 app.mount("/request-handler", app=request_handler_app.app)

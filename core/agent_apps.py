@@ -11,6 +11,7 @@ from core.agent_list import get_agent_config_by_id
 
 pdf_to_markdown_agent = get_agent_config_by_id("pdf-to-markdown")
 pdf_to_markdown_agent.router = pdf_to_markdown.router
+pdf_to_markdown_agent.app = pdf_to_markdown.app
 
 # pptx_creator_agent = get_agent_config_by_id("pptx-creator")
 # pptx_creator_agent.router = pptx_creator.router
@@ -26,6 +27,7 @@ pdf_to_markdown_agent.router = pdf_to_markdown.router
 
 text_to_speed_agent = get_agent_config_by_id("text-to-speech")
 text_to_speed_agent.router = text_to_speech.router
+text_to_speed_agent.app = text_to_speech.app
 
 AGENT_APPS = [
     pdf_to_markdown_agent,
