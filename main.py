@@ -41,10 +41,9 @@ def read_main(request: Request):
         {"request": request, "base_path": config.base_path, "agents": AGENT_APPS},
     )
 
-
-
 for agent in AGENT_APPS:
-    app.include_router(agent.router, prefix=f"/{agent.id}")
+    agent_base_path = f"/{config.base_path}" if config.base_path else ""
+    app.include_router(agent.router, prefix=f"{agent_base_path}/{agent.id}")
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 app.mount("/request-handler", app=request_handler_app.app)

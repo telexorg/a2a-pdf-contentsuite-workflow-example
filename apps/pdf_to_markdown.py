@@ -46,7 +46,6 @@ pdf_to_markdown_agent = Agent(
     ),
 )
 
-# router = APIRouter(prefix="/pdf-to-markdown")
 router = APIRouter()
 active_tasks: dict[str, schemas.Task] = {}
 

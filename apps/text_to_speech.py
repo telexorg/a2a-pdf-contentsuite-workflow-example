@@ -18,7 +18,7 @@ from core.config import config
 from services.task_handler import process_tts_task_background, stream_tts_processing
 from utils.options import parse_tts_options
 
-router = APIRouter(prefix="/text-to-speech")
+router = APIRouter()
 active_tasks: dict[str, schemas.Task] = {}
 
 
@@ -42,8 +42,7 @@ def read_tts_agent(request: Request):
     return get_agent_response("text-to-speech", request)
 
 
-@router.post("", include_in_schema=False)
-@router.post("/", include_in_schema=True)
+@router.post("/")
 async def handle_json_rpc(
     request: Union[
         schemas.SendMessageRequest, schemas.StreamMessageRequest, schemas.GetTaskRequest
